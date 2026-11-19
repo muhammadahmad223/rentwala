@@ -1,0 +1,13 @@
+RentWala v2 (guided setup + rooms + beds + payments)
+
+1) Unzip this INTO your rentwala folder, overwrite when asked.
+2) Delete the old v1 files that v2 no longer uses:
+   Windows (PowerShell):
+     del app\Models\Property.php, app\Models\Unit.php, app\Models\Renter.php, app\Models\Lease.php, app\Http\Controllers\RentController.php, resources\views\list.blade.php
+   Mac/Linux:
+     rm app/Models/{Property,Unit,Renter,Lease}.php app/Http/Controllers/RentController.php resources/views/list.blade.php
+3) php artisan migrate:fresh --seed     (this clears the old test data)
+4) php artisan storage:link             (needed so resident photos show)
+5) php artisan serve
+Register a new owner: you will be taken through the 3-step setup.
+Super admin: admin@rentwala.test / password123

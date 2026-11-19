@@ -1,0 +1,12 @@
+RentWala demo (overlay for a fresh Laravel project)
+
+1) composer create-project laravel/laravel rentwala
+2) Unzip this file INTO the rentwala folder (say yes to overwrite)
+3) In .env set:  DB_CONNECTION=mysql  DB_DATABASE=rentwala  DB_USERNAME=root  DB_PASSWORD=
+   (create an empty MySQL database named rentwala first)
+4) php artisan migrate --seed
+5) php artisan serve  -> http://127.0.0.1:8000
+
+Owner: click "Create an account" (each owner sees only their own data)
+Super admin: admin@rentwala.test / password123  (change it!)
+Bootstrap loads from a CDN, so the browser needs internet.
