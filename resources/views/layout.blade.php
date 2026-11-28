@@ -9,8 +9,11 @@
 <style>
 :root{--ink:#10343a;--brand:#0b6e6e;--late:#b42318;--ok:#1a7f37;--bg:#f2f5f6}
 html{font-size:18px}
-body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:#16262a;padding-bottom:84px}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:#16262a;padding-bottom:84px;overflow-wrap:anywhere}
 .navbar{background:var(--ink)} .navbar .nav-link{color:#d5e8e8;font-size:1.05rem} .navbar .nav-link.active{color:#fff;font-weight:700}
+.navbar .navbar-brand{min-width:0;max-width:70%;white-space:normal;overflow-wrap:anywhere;line-height:1.15}
+.brand-mark{width:34px;height:34px;display:grid;place-items:center;flex:none;border:1px solid #ffffff30;border-radius:11px;background:#ffffff16;color:#9ee7cb;font-size:1rem;overflow:hidden}
+.brand-logo{width:100%;height:100%;object-fit:cover}
 .btn{min-height:50px;font-weight:600;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;gap:.4rem}
 .btn-brand{background:var(--brand);color:#fff} .btn-brand:hover{background:#09595a;color:#fff}
 .form-control,.form-select{min-height:52px;font-size:1.05rem} .form-label{font-weight:600;margin-bottom:.25rem}
@@ -26,11 +29,13 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);c
 </style></head><body>
 @php($nav = ['dashboard'=>['Home','house-door'],'rooms'=>[$u->word('spaces'),'door-open'],'payments'=>['Payments','cash-coin'],'settings'=>['Settings','gear']])
 <nav class="navbar navbar-dark mb-4"><div class="container">
-<a class="navbar-brand fw-bold" href="/dashboard">{{ $u->business_name ?: 'RentWala' }}</a>
+<a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="/dashboard">
+@if($u->logo_path)<span class="brand-mark"><img class="brand-logo" src="{{ asset('storage/'.$u->logo_path) }}" alt=""></span>@else<span class="brand-mark"><i class="bi bi-buildings" aria-hidden="true"></i></span>@endif
+<span>{{ $u->business_name ?: 'RentWala' }}</span></a>
 <div class="d-none d-lg-flex gap-3 align-items-center">
 @foreach($nav as $url=>[$label,$icon])<a class="nav-link {{ request()->is($url.'*') ? 'active' : '' }}" href="/{{ $url }}">{{ $label }}</a>@endforeach
-<form method="POST" action="/logout">@csrf<button class="btn btn-sm btn-outline-light" style="min-height:40px">Log out</button></form></div>
-<form class="d-lg-none" method="POST" action="/logout">@csrf<button class="btn btn-sm btn-outline-light" style="min-height:40px">Log out</button></form>
+@unless(request()->is('dashboard'))<form method="POST" action="/logout">@csrf<button class="btn btn-sm btn-outline-light" style="min-height:40px">Log out</button></form>@endunless</div>
+@unless(request()->is('dashboard'))<form class="d-lg-none" method="POST" action="/logout">@csrf<button class="btn btn-sm btn-outline-light" style="min-height:40px">Log out</button></form>@endunless
 </div></nav>
 <main class="container pb-4">
 @if(session('ok'))<div class="alert alert-success fs-6">{{ session('ok') }}</div>@endif

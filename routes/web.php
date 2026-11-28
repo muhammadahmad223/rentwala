@@ -25,6 +25,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/rooms/{space}/assign', [AppController::class, 'assign']);
         Route::post('/people/{id}/leave', [AppController::class, 'leave']);
         Route::get('/payments', [AppController::class, 'payments']);
+        Route::get('/payments/export/excel', [AppController::class, 'exportPaymentsExcel'])->name('payments.export.excel');
+        Route::get('/payments/export/pdf', [AppController::class, 'exportPaymentsPdf'])->name('payments.export.pdf');
         Route::post('/payments', [AppController::class, 'payStore']);
         Route::get('/settings', [AppController::class, 'settings']);
         Route::post('/settings', [AppController::class, 'settingsSave']);

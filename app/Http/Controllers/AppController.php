@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Contracts\View\View;
 use App\Models\Occupant;
 use App\Models\Payment;
 use App\Models\Space;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AppController extends Controller
 {
@@ -107,8 +111,9 @@ class AppController extends Controller
     }
 
     /* ---------- payments ---------- */
-    public function payments(Request $r)
+    public function payments(Request $r): View
     {
+        $filters = $this->paymentFilters($r);
         $month = now()->startOfMonth();
         $paid = Payment::whereDate('for_month', $month)->get()->groupBy('occupant_id')->map->sum('amount');
         $people = Occupant::with('space')->where('status', 'active')->orderBy('name')->get()
@@ -116,8 +121,89 @@ class AppController extends Controller
 
         return view('payments', [
             'people' => $people, 'pick' => $people->firstWhere('id', (int) $r->query('occupant')),
-            'history' => Payment::with('occupant.space')->latest('paid_on')->latest('id')->limit(40)->get(),
+            'history' => $this->paymentHistoryQuery($filters)->paginate(20)->withQueryString(),
+            'filters' => $filters,
         ]);
+    }
+
+    /** @return array{search?: string|null, from?: string|null, to?: string|null} */
+    private function paymentFilters(Request $request): array
+    {
+        return $request->validate([
+            'search' => ['nullable', 'string', 'max:120'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+    }
+
+    /** @param array{search?: string|null, from?: string|null, to?: string|null} $filters */
+    private function paymentHistoryQuery(array $filters): Builder
+    {
+        $query = Payment::query()->with('occupant.space')->latest('paid_on')->latest('id');
+
+        if (filled($filters['search'] ?? null)) {
+            $search = '%'.trim($filters['search']).'%';
+            $query->where(function (Builder $query) use ($search) {
+                $query->whereHas('occupant', function (Builder $occupants) use ($search) {
+                    $occupants->where('name', 'like', $search)->orWhere('phone', 'like', $search);
+                })->orWhereHas('occupant.space', function (Builder $spaces) use ($search) {
+                    $spaces->where('name', 'like', $search);
+                })->orWhere('method', 'like', $search);
+            });
+        }
+
+        if (filled($filters['from'] ?? null)) {
+            $query->whereDate('paid_on', '>=', $filters['from']);
+        }
+
+        if (filled($filters['to'] ?? null)) {
+            $query->whereDate('paid_on', '<=', $filters['to']);
+        }
+
+        return $query;
+    }
+
+    public function exportPaymentsExcel(Request $request): StreamedResponse
+    {
+        $filters = $this->paymentFilters($request);
+        $fileName = 'rentwala-payments-'.now()->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () use ($filters) {
+            $output = fopen('php://output', 'w');
+            fwrite($output, "\xEF\xBB\xBF");
+            fputcsv($output, ['Resident', 'Phone', 'Room / space', 'Rent month', 'Date received', 'Amount (Rs)', 'Method'], ',', '"', '\\');
+
+            $this->paymentHistoryQuery($filters)->chunk(500, function ($payments) use ($output) {
+                foreach ($payments as $payment) {
+                    fputcsv($output, [
+                        $this->spreadsheetSafeText($payment->occupant->name),
+                        $this->spreadsheetSafeText($payment->occupant->phone),
+                        $this->spreadsheetSafeText($payment->occupant->space->name),
+                        $payment->for_month->format('Y-m'),
+                        $payment->paid_on->format('Y-m-d'),
+                        $payment->amount,
+                        $this->spreadsheetSafeText($payment->method),
+                    ], ',', '"', '\\');
+                }
+            });
+
+            fclose($output);
+        }, $fileName, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    public function exportPaymentsPdf(Request $request): View
+    {
+        $filters = $this->paymentFilters($request);
+
+        return view('payments-export-pdf', [
+            'payments' => $this->paymentHistoryQuery($filters)->get(),
+            'filters' => $filters,
+        ]);
+    }
+
+    private function spreadsheetSafeText(string $value): string
+    {
+        return preg_match('/^[\t\r\n ]*[=+\-@]/u', $value) === 1 ? "'".$value : $value;
     }
 
     public function payStore(Request $r)
@@ -141,7 +227,23 @@ class AppController extends Controller
 
     public function settingsSave(Request $r)
     {
-        auth()->user()->update($r->validate(['business_name' => 'required|max:80']));
+        $data = $r->validate([
+            'business_name' => ['required', 'string', 'max:80'],
+            'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+        ]);
+        $user = auth()->user();
+        $oldLogoPath = $user->logo_path;
+        unset($data['logo']);
+
+        if ($r->hasFile('logo')) {
+            $data['logo_path'] = $r->file('logo')->store('logos/'.$user->id, 'public');
+        }
+
+        $user->update($data);
+
+        if (isset($data['logo_path']) && $oldLogoPath) {
+            Storage::disk('public')->delete($oldLogoPath);
+        }
 
         return back()->with('ok', 'Saved.');
     }
